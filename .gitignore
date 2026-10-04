@@ -1,0 +1,35 @@
+*.iml
+.gradle
+.kotlin
+/local.properties
+/.idea/
+.DS_Store
+/build
+/app/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# Android build output
+*.apk
+*.aab
+*.ap_
+*.dex
+release/
+
+# Signing material — never commit keystores or secrets
+*.jks
+*.keystore
+keystore.properties
+
+# Test / tooling output
+/test-results/
+/reports/
+hs_err_pid*.log
+replay_pid*.log
+*.hprof
+
+# OS / editor noise
+Thumbs.db
+*.swp
