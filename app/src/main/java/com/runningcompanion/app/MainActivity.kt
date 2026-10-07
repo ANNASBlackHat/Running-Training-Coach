@@ -52,18 +52,19 @@ sealed interface Screen {
 
 class MainActivity : ComponentActivity() {
 
-    private var workoutService: WorkoutForegroundService? = null
+    private val _serviceFlow = kotlinx.coroutines.flow.MutableStateFlow<WorkoutForegroundService?>(null)
     private var isServiceBound = false
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
             val localBinder = binder as? WorkoutForegroundService.LocalBinder
-            workoutService = localBinder?.service
+            val service = localBinder?.service
+            _serviceFlow.value = service
             isServiceBound = true
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
-            workoutService = null
+            _serviceFlow.value = null
             isServiceBound = false
         }
     }
@@ -178,9 +179,24 @@ class MainActivity : ComponentActivity() {
                     val allSessions by appContainer.sessionRepository.getAllSessions()
                         .collectAsState(initial = emptyList())
 
+                    // Observe service connection
+                    val currentService by _serviceFlow.collectAsState()
+
+                    // Automatically restore live workout screen if service is running or paused
+                    LaunchedEffect(currentService) {
+                        val service = currentService ?: return@LaunchedEffect
+                        service.activeWorkout.collect { runningWorkout ->
+                            if (runningWorkout != null) {
+                                if (currentScreen !is Screen.Run) {
+                                    currentScreen = Screen.Run(runningWorkout)
+                                }
+                            }
+                        }
+                    }
+
                     // Listen to completed sessions from service
-                    LaunchedEffect(workoutService) {
-                        val service = workoutService ?: return@LaunchedEffect
+                    LaunchedEffect(currentService) {
+                        val service = currentService ?: return@LaunchedEffect
                         service.sessionCompleted.collect { completedSession ->
                             appContainer.sessionRepository.saveSession(completedSession)
                             currentScreen = Screen.Results(completedSession)
@@ -239,16 +255,16 @@ class MainActivity : ComponentActivity() {
                         }
 
                         is Screen.Run -> {
-                            val snapshot by (workoutService?.snapshot ?: remember { kotlinx.coroutines.flow.MutableStateFlow<RunnerSnapshot?>(null) })
+                            val snapshot by (currentService?.snapshot ?: remember { kotlinx.coroutines.flow.MutableStateFlow<RunnerSnapshot?>(null) })
                                 .collectAsState()
 
                             LiveRunScreen(
                                 snapshot = snapshot,
                                 allSegments = screen.workout.flatten(),
-                                onPauseClicked = { workoutService?.pauseWorkout() },
-                                onResumeClicked = { workoutService?.resumeWorkout() },
-                                onSkipClicked = { workoutService?.skipSegment() },
-                                onStopConfirmed = { workoutService?.stopWorkout() }
+                                onPauseClicked = { currentService?.pauseWorkout() },
+                                onResumeClicked = { currentService?.resumeWorkout() },
+                                onSkipClicked = { currentService?.skipSegment() },
+                                onStopConfirmed = { currentService?.stopWorkout() }
                             )
                         }
 

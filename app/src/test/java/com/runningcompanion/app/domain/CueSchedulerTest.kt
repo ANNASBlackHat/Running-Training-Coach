@@ -116,4 +116,28 @@ class CueSchedulerTest {
         val cooldownCues = scheduler.checkCues(testSegment, 40, 150.0, 240.0, 40_000L)
         assertThat(cooldownCues.any { it is CueEvent.PaceAlert }).isFalse()
     }
+
+    @Test
+    fun testBackOnPaceCue_firesWhenRunnerReturnsToTargetRange() {
+        scheduler.checkCues(testSegment, 0, 0.0, null, 1000L)
+
+        // Trigger an out-of-range alert first
+        scheduler.checkCues(testSegment, 26, 90.0, 240.0, 26_000L)
+        val alertCues = scheduler.checkCues(testSegment, 34, 120.0, 240.0, 34_000L)
+        assertThat(alertCues.any { it is CueEvent.PaceAlert }).isTrue()
+
+        // Runner adjusts pace back to target (e.g. 285s / km, inside 270..300)
+        val recoveryImmediate = scheduler.checkCues(testSegment, 35, 125.0, 285.0, 35_000L)
+        assertThat(recoveryImmediate.any { it is CueEvent.BackOnPace }).isFalse()
+
+        // After sustaining target pace for 3+ seconds (35s -> 38s)
+        val recoverySustained = scheduler.checkCues(testSegment, 38, 140.0, 285.0, 38_000L)
+        val backOnPace = recoverySustained.filterIsInstance<CueEvent.BackOnPace>()
+        assertThat(backOnPace).hasSize(1)
+        assertThat(backOnPace.first().currentPaceSecPerKm).isEqualTo(285.0)
+
+        // Subsequent ticks in range do NOT repeat BackOnPace
+        val subsequent = scheduler.checkCues(testSegment, 39, 145.0, 285.0, 39_000L)
+        assertThat(subsequent.any { it is CueEvent.BackOnPace }).isFalse()
+    }
 }

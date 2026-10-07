@@ -51,6 +51,11 @@ class WorkoutRunner(
     private var totalDistanceM: Double = 0.0
     private var lastAcceptedPoint: GpsPoint? = null
 
+    // Km split announcement state
+    private var lastAnnouncedKm: Int = 0
+    private var lastKmSplitTimeMs: Long = 0L
+    private var lastKmSplitPausedMs: Long = 0L
+
     private val currentSegmentPoints = mutableListOf<GpsPoint>()
     private val allTrackPoints = mutableListOf<GpsPoint>()
     private val completedSegmentResults = mutableListOf<SegmentResult>()
@@ -68,6 +73,9 @@ class WorkoutRunner(
         currentSegmentDistanceM = 0.0
         totalDistanceM = 0.0
         lastAcceptedPoint = null
+        lastAnnouncedKm = 0
+        lastKmSplitTimeMs = nowMs
+        lastKmSplitPausedMs = 0L
         currentSegmentPoints.clear()
         allTrackPoints.clear()
         completedSegmentResults.clear()
@@ -128,11 +136,43 @@ class WorkoutRunner(
         // Check if distance-based segment is complete
         val currentSeg = currentSegment ?: return emptyList()
         val len = currentSeg.segment.length
+
+        // Check if a 1-km milestone was reached
+        val kmCues = checkKmSplit(nowMs)
+
         if (len is SegmentLength.Distance && currentSegmentDistanceM >= len.meters) {
-            return advanceSegment(nowMs)
+            return kmCues + advanceSegment(nowMs)
         }
 
-        return getCues(nowMs)
+        return kmCues + getCues(nowMs)
+    }
+
+    private fun checkKmSplit(nowMs: Long): List<CueEvent> {
+        val currentKm = (totalDistanceM / 1000.0).toInt()
+        if (currentKm > lastAnnouncedKm && currentKm >= 1) {
+            val completedKm = currentKm
+            lastAnnouncedKm = currentKm
+
+            // Active elapsed time for this completed kilometer
+            val pausedDuringKm = (totalPausedMs - lastKmSplitPausedMs).coerceAtLeast(0L)
+            val timeForKmMs = (nowMs - lastKmSplitTimeMs - pausedDuringKm).coerceAtLeast(1000L)
+            val splitPaceSec = timeForKmMs / 1000.0 // 1 km pace is precisely time for 1 km
+
+            lastKmSplitTimeMs = nowMs
+            lastKmSplitPausedMs = totalPausedMs
+
+            val ongoingPause = if (state == RunnerState.PAUSED) (nowMs - pauseStartTimestamp).coerceAtLeast(0L) else 0L
+            val totalActiveDurationSec = ((nowMs - workoutStartTimestamp - totalPausedMs - ongoingPause) / 1000L).coerceAtLeast(0L)
+
+            return listOf(
+                CueEvent.KmSplitAlert(
+                    kilometer = completedKm,
+                    splitPaceSecPerKm = splitPaceSec,
+                    totalDurationSec = totalActiveDurationSec
+                )
+            )
+        }
+        return emptyList()
     }
 
     fun tick(nowMs: Long): List<CueEvent> {

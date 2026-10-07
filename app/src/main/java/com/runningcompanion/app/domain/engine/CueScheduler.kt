@@ -46,6 +46,21 @@ sealed interface CueEvent {
         override val isHighPriority: Boolean = false
     }
 
+    data class BackOnPace(
+        val currentPaceSecPerKm: Double,
+        val paceRange: PaceRange
+    ) : CueEvent {
+        override val isHighPriority: Boolean = false
+    }
+
+    data class KmSplitAlert(
+        val kilometer: Int,
+        val splitPaceSecPerKm: Double,
+        val totalDurationSec: Long
+    ) : CueEvent {
+        override val isHighPriority: Boolean = false
+    }
+
     data class SetsLeft(val setsRemaining: Int) : CueEvent {
         override val isHighPriority: Boolean = false
     }
@@ -65,6 +80,8 @@ class CueScheduler {
     private var outOfRangeStartTimestamp: Long? = null
     private var lastPaceAlertTimestamp: Long = 0L
     private var lastPaceAlertDirection: CueEvent.PaceAlertDirection? = null
+    private var isCurrentlyOutOfRange: Boolean = false
+    private var inRangeStartTimestamp: Long? = null
 
     fun resetForNewSegment() {
         firedStartCue = false
@@ -72,6 +89,8 @@ class CueScheduler {
         firedRemainingCue = false
         firedCountdownSeconds.clear()
         outOfRangeStartTimestamp = null
+        isCurrentlyOutOfRange = false
+        inRangeStartTimestamp = null
     }
 
     fun checkCues(
@@ -152,15 +171,17 @@ class CueScheduler {
         currentPaceSecPerKm: Double?,
         segmentElapsedSec: Long,
         nowMs: Long
-    ): CueEvent.PaceAlert? {
+    ): CueEvent? {
         if (paceRange == null || currentPaceSecPerKm == null) {
             outOfRangeStartTimestamp = null
+            inRangeStartTimestamp = null
             return null
         }
 
         // Extended grace period: 25s post-transition before any pace alerts fire
         if (segmentElapsedSec < 25) {
             outOfRangeStartTimestamp = null
+            inRangeStartTimestamp = null
             return null
         }
 
@@ -170,33 +191,55 @@ class CueScheduler {
             else -> null
         }
 
-        if (direction == null) {
+        if (direction != null) {
+            // Out of range
+            inRangeStartTimestamp = null
+            val startTime = outOfRangeStartTimestamp
+            if (startTime == null) {
+                outOfRangeStartTimestamp = nowMs
+                return null
+            } else if (nowMs - startTime < 7_800L) {
+                return null
+            }
+
+            // Mark that runner is confirmed out of range
+            isCurrentlyOutOfRange = true
+
+            // Cooldown: at most one alert every 25 seconds
+            if (nowMs - lastPaceAlertTimestamp < 25_000L) {
+                return null
+            }
+
+            lastPaceAlertTimestamp = nowMs
+            lastPaceAlertDirection = direction
             outOfRangeStartTimestamp = null
+            return CueEvent.PaceAlert(
+                direction = direction,
+                currentPaceSecPerKm = currentPaceSecPerKm,
+                paceRange = paceRange
+            )
+        } else {
+            // In range!
+            outOfRangeStartTimestamp = null
+
+            if (isCurrentlyOutOfRange) {
+                val inStartTime = inRangeStartTimestamp
+                if (inStartTime == null) {
+                    inRangeStartTimestamp = nowMs
+                    return null
+                } else if (nowMs - inStartTime >= 3_000L) {
+                    // Runner has maintained target pace for 3+ seconds!
+                    isCurrentlyOutOfRange = false
+                    inRangeStartTimestamp = null
+                    lastPaceAlertTimestamp = nowMs // prevent immediate alert fluctuation
+                    return CueEvent.BackOnPace(
+                        currentPaceSecPerKm = currentPaceSecPerKm,
+                        paceRange = paceRange
+                    )
+                }
+            }
             return null
         }
-
-        // Must be out of range continuously for ~8 seconds
-        val startTime = outOfRangeStartTimestamp
-        if (startTime == null) {
-            outOfRangeStartTimestamp = nowMs
-            return null
-        } else if (nowMs - startTime < 7_800L) {
-            return null
-        }
-
-        // Cooldown: at most one alert every 25 seconds
-        if (nowMs - lastPaceAlertTimestamp < 25_000L) {
-            return null
-        }
-
-        lastPaceAlertTimestamp = nowMs
-        lastPaceAlertDirection = direction
-        outOfRangeStartTimestamp = null
-        return CueEvent.PaceAlert(
-            direction = direction,
-            currentPaceSecPerKm = currentPaceSecPerKm,
-            paceRange = paceRange
-        )
     }
 
     fun onRestSegmentEnd(currentSet: Int, totalSets: Int): CueEvent.SetsLeft? {

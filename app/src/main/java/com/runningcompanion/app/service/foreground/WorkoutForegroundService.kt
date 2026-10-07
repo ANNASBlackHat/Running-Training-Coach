@@ -53,6 +53,9 @@ class WorkoutForegroundService : Service() {
     private var locationProvider: LocationProvider? = null
     private var wakeLock: PowerManager.WakeLock? = null
 
+    private val _activeWorkout = MutableStateFlow<Workout?>(null)
+    val activeWorkout: StateFlow<Workout?> = _activeWorkout.asStateFlow()
+
     private val _snapshot = MutableStateFlow<RunnerSnapshot?>(null)
     val snapshot: StateFlow<RunnerSnapshot?> = _snapshot.asStateFlow()
 
@@ -94,6 +97,7 @@ class WorkoutForegroundService : Service() {
     fun startWorkout(workout: Workout) {
         val activeRunner = WorkoutRunner(workout)
         runner = activeRunner
+        _activeWorkout.value = workout
 
         wakeLock?.acquire(3 * 60 * 60 * 1000L) // 3 hours max safe timeout
 
@@ -152,6 +156,7 @@ class WorkoutForegroundService : Service() {
     fun stopWorkout() {
         val now = System.currentTimeMillis()
         val finalSession = runner?.stop(now)
+        _activeWorkout.value = null
         cleanUp()
         if (finalSession != null) {
             _sessionCompleted.tryEmit(finalSession)
@@ -163,6 +168,7 @@ class WorkoutForegroundService : Service() {
     private fun checkIfFinished(curRunner: WorkoutRunner, now: Long) {
         if (curRunner.activeState == RunnerState.FINISHED) {
             val session = curRunner.buildSessionResult(now)
+            _activeWorkout.value = null
             cleanUp()
             _sessionCompleted.tryEmit(session)
             stopForeground(STOP_FOREGROUND_REMOVE)
@@ -208,7 +214,7 @@ class WorkoutForegroundService : Service() {
 
     private fun buildNotification(snap: RunnerSnapshot): Notification {
         val openAppIntent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
         val openPendingIntent = PendingIntent.getActivity(
             this,
@@ -236,6 +242,38 @@ class WorkoutForegroundService : Service() {
         val title = "$typeName | $remainingText left"
         val content = "Pace: $paceText/km • Total: %.2f km".format(snap.totalDistanceM / 1000.0)
 
+        // Notification actions
+        val pauseResumeIntent = Intent(this, WorkoutForegroundService::class.java).apply {
+            action = if (snap.state == RunnerState.RUNNING) ACTION_PAUSE else ACTION_RESUME
+        }
+        val pauseResumePendingIntent = PendingIntent.getService(
+            this,
+            1,
+            pauseResumeIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val pauseResumeActionTitle = if (snap.state == RunnerState.RUNNING) "Pause" else "Resume"
+
+        val skipIntent = Intent(this, WorkoutForegroundService::class.java).apply {
+            action = ACTION_SKIP
+        }
+        val skipPendingIntent = PendingIntent.getService(
+            this,
+            2,
+            skipIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val stopIntent = Intent(this, WorkoutForegroundService::class.java).apply {
+            action = ACTION_STOP
+        }
+        val stopPendingIntent = PendingIntent.getService(
+            this,
+            3,
+            stopIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setContentTitle(title)
@@ -244,6 +282,9 @@ class WorkoutForegroundService : Service() {
             .setContentIntent(openPendingIntent)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setCategory(NotificationCompat.CATEGORY_WORKOUT)
+            .addAction(android.R.drawable.ic_media_pause, pauseResumeActionTitle, pauseResumePendingIntent)
+            .addAction(android.R.drawable.ic_media_next, "Skip", skipPendingIntent)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop", stopPendingIntent)
             .build()
     }
 

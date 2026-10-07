@@ -108,5 +108,22 @@ class PaceCalculator(
                 "%02d:%02d".format(minutes, seconds)
             }
         }
+
+        fun formatTimeSpeech(totalSeconds: Long): String {
+            val hours = totalSeconds / 3600
+            val minutes = (totalSeconds % 3600) / 60
+            val seconds = totalSeconds % 60
+            val parts = mutableListOf<String>()
+            if (hours > 0) {
+                parts.add("$hours hour${if (hours > 1) "s" else ""}")
+            }
+            if (minutes > 0) {
+                parts.add("$minutes minute${if (minutes > 1) "s" else ""}")
+            }
+            if (seconds > 0 || parts.isEmpty()) {
+                parts.add("$seconds second${if (seconds > 1) "s" else ""}")
+            }
+            return parts.joinToString(" ")
+        }
     }
 }

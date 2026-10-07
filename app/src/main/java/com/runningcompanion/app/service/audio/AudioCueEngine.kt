@@ -86,6 +86,22 @@ class AudioCueEngine(
                     speak(text, isHighPriority = false)
                 }
             }
+            is CueEvent.BackOnPace -> {
+                if (isVoiceEnabled) {
+                    val currentPaceStr = com.runningcompanion.app.domain.math.PaceCalculator.formatPaceSpeech(cue.currentPaceSecPerKm)
+                    val text = "Back on target pace: $currentPaceStr."
+                    speak(text, isHighPriority = false)
+                }
+            }
+            is CueEvent.KmSplitAlert -> {
+                if (isVoiceEnabled) {
+                    val kmWord = if (cue.kilometer == 1) "1 kilometer" else "${cue.kilometer} kilometers"
+                    val splitPaceStr = com.runningcompanion.app.domain.math.PaceCalculator.formatPaceSpeech(cue.splitPaceSecPerKm)
+                    val totalTimeStr = com.runningcompanion.app.domain.math.PaceCalculator.formatTimeSpeech(cue.totalDurationSec)
+                    val text = "$kmWord. Split pace $splitPaceStr. Total time $totalTimeStr."
+                    speak(text, isHighPriority = false)
+                }
+            }
             is CueEvent.SetsLeft -> {
                 if (isVoiceEnabled) {
                     val word = if (cue.setsRemaining == 1) "set" else "sets"

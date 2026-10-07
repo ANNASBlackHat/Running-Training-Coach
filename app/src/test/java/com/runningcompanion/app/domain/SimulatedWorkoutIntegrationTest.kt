@@ -56,6 +56,11 @@ class SimulatedWorkoutIntegrationTest {
         val completeCues = collectedCues.filterIsInstance<CueEvent.WorkoutComplete>()
         assertThat(completeCues).hasSize(1)
 
+        val kmSplitCues = collectedCues.filterIsInstance<CueEvent.KmSplitAlert>()
+        // Total distance > 8.0 km, so we should have alerts for km 1 through 8
+        assertThat(kmSplitCues).hasSize(8)
+        assertThat(kmSplitCues.map { it.kilometer }).containsExactly(1, 2, 3, 4, 5, 6, 7, 8).inOrder()
+
         // Verify final session results
         val session = runner.buildSessionResult(mockGps.currentTimestamp)
         assertThat(session.results).hasSize(10)
