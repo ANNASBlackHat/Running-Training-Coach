@@ -36,17 +36,25 @@ abstract class AppDatabase : RoomDatabase() {
                 ).addCallback(object : Callback() {
                     override fun onCreate(db: SupportSQLiteDatabase) {
                         super.onCreate(db)
-                        // Seed default templates
-                        CoroutineScope(Dispatchers.IO).launch {
-                            val templates = WorkoutTemplates.allTemplates.map {
-                                WorkoutEntity.fromDomain(it)
-                            }
-                            getInstance(context).workoutDao().insertWorkouts(templates)
-                        }
+                        seedTemplates(context)
+                    }
+
+                    override fun onOpen(db: SupportSQLiteDatabase) {
+                        super.onOpen(db)
+                        seedTemplates(context)
                     }
                 }).build()
                 INSTANCE = instance
                 instance
+            }
+        }
+
+        private fun seedTemplates(context: Context) {
+            CoroutineScope(Dispatchers.IO).launch {
+                val templates = WorkoutTemplates.allTemplates.map {
+                    WorkoutEntity.fromDomain(it)
+                }
+                getInstance(context).workoutDao().insertWorkouts(templates)
             }
         }
     }

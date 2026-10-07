@@ -80,5 +80,73 @@ object WorkoutTemplates {
         )
     )
 
-    val allTemplates = listOf(norwegian4x4, repeats400m)
+    val tempoRun = Workout(
+        id = "template_tempo_run",
+        name = "Continuous Tempo (20 min)",
+        isTemplate = true,
+        items = listOf(
+            WorkoutItem.Single(
+                Segment(
+                    id = UUID.randomUUID().toString(),
+                    type = SegmentType.WARMUP,
+                    length = SegmentLength.Time(600) // 10 min
+                )
+            ),
+            WorkoutItem.Single(
+                Segment(
+                    id = UUID.randomUUID().toString(),
+                    type = SegmentType.RUN,
+                    length = SegmentLength.Time(1200), // 20 min threshold
+                    paceRange = PaceRange(fastSecPerKm = 300, slowSecPerKm = 315) // 5:00 - 5:15 min/km
+                )
+            ),
+            WorkoutItem.Single(
+                Segment(
+                    id = UUID.randomUUID().toString(),
+                    type = SegmentType.COOLDOWN,
+                    length = SegmentLength.Time(300) // 5 min
+                )
+            )
+        )
+    )
+
+    val tempoSplits = Workout(
+        id = "template_tempo_splits",
+        name = "Tempo Splits (3x 8 min)",
+        isTemplate = true,
+        items = listOf(
+            WorkoutItem.Single(
+                Segment(
+                    id = UUID.randomUUID().toString(),
+                    type = SegmentType.WARMUP,
+                    length = SegmentLength.Time(600) // 10 min
+                )
+            ),
+            WorkoutItem.Repeat(
+                count = 3,
+                segments = listOf(
+                    Segment(
+                        id = UUID.randomUUID().toString(),
+                        type = SegmentType.RUN,
+                        length = SegmentLength.Time(480), // 8 min threshold
+                        paceRange = PaceRange(fastSecPerKm = 300, slowSecPerKm = 315) // 5:00 - 5:15 min/km
+                    ),
+                    Segment(
+                        id = UUID.randomUUID().toString(),
+                        type = SegmentType.REST,
+                        length = SegmentLength.Time(90) // 1.5 min jog/rest
+                    )
+                )
+            ),
+            WorkoutItem.Single(
+                Segment(
+                    id = UUID.randomUUID().toString(),
+                    type = SegmentType.COOLDOWN,
+                    length = SegmentLength.Time(300) // 5 min
+                )
+            )
+        )
+    )
+
+    val allTemplates = listOf(norwegian4x4, repeats400m, tempoRun, tempoSplits)
 }
