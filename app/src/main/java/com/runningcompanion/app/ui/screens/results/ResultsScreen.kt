@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -25,9 +26,14 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,6 +47,7 @@ import com.runningcompanion.app.domain.model.SegmentType
 import com.runningcompanion.app.domain.model.Session
 import com.runningcompanion.app.ui.components.SessionStrip
 import com.runningcompanion.app.ui.components.WorkoutMapView
+import com.runningcompanion.app.ui.share.ShareSheet
 import com.runningcompanion.app.ui.theme.AppColors
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -53,6 +60,7 @@ fun ResultsScreen(
     modifier: Modifier = Modifier
 ) {
     val dateFormat = SimpleDateFormat("EEEE, d MMM yyyy • HH:mm", Locale.getDefault())
+    var showShareSheet by remember { mutableStateOf(false) }
 
     // Find the fastest run segment to highlight
     val runSegments = session.results.filter { it.type == SegmentType.RUN && (it.avgPaceSecPerKm ?: Double.MAX_VALUE) > 0 }
@@ -86,6 +94,22 @@ fun ResultsScreen(
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 80.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
+            // Share / export entry point
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    IconButton(onClick = { showShareSheet = true }) {
+                        Icon(
+                            imageVector = Icons.Filled.Share,
+                            contentDescription = "Share results",
+                            tint = AppColors.Ink
+                        )
+                    }
+                }
+            }
+
             // Strava-Style Hero Header
             item {
                 Column {
@@ -251,6 +275,13 @@ fun ResultsScreen(
                 HorizontalDivider(color = AppColors.Line, thickness = 1.dp)
             }
         }
+    }
+
+    if (showShareSheet) {
+        ShareSheet(
+            session = session,
+            onDismiss = { showShareSheet = false }
+        )
     }
 }
 
