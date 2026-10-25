@@ -81,6 +81,12 @@ class ResultsScreenTest {
         composeRule.onNodeWithText("GPX").assertIsDisplayed()
         composeRule.onNodeWithText("Done").assertIsDisplayed()
 
+        composeRule.onNodeWithText("Full").assertIsDisplayed()
+        composeRule.onNodeWithText("Route").assertIsDisplayed()
+        composeRule.onNodeWithText("Laps").assertIsDisplayed()
+        composeRule.onNodeWithText("Route").performClick()
+        composeRule.onNodeWithText("Share workout").assertIsDisplayed()
+
         composeRule.onNodeWithText("Done").performClick()
         composeRule.onNodeWithText("Share workout").assertDoesNotExist()
     }

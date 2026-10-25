@@ -10,6 +10,7 @@ import android.os.Environment
 import android.provider.MediaStore
 import androidx.core.content.FileProvider
 import com.runningcompanion.app.domain.model.Session
+import com.runningcompanion.app.domain.share.CardTemplate
 import com.runningcompanion.app.domain.share.GpxExporter
 import com.runningcompanion.app.domain.share.ShareCardModel
 import java.io.File
@@ -24,10 +25,10 @@ object ShareActions {
 
     const val FILE_PROVIDER_AUTHORITIES_SUFFIX = ".fileprovider"
 
-    fun writeCardPng(context: Context, session: Session): File {
+    fun writeCardPng(context: Context, session: Session, template: CardTemplate = CardTemplate.FULL): File {
         val dir = File(context.cacheDir, "share").apply { mkdirs() }
-        val file = File(dir, "${session.id}.png")
-        val bitmap = ShareCardRenderer.render(ShareCardModel.fromSession(session))
+        val file = File(dir, "${session.id}-${template.name.lowercase()}.png")
+        val bitmap = ShareCardRenderer.render(ShareCardModel.fromSession(session), template)
         FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 90, it) }
         return file
     }

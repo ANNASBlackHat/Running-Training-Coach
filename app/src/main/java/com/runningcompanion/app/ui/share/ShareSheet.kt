@@ -14,6 +14,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -30,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.runningcompanion.app.domain.model.Session
+import com.runningcompanion.app.domain.share.CardTemplate
 import com.runningcompanion.app.domain.share.ShareCardModel
 import com.runningcompanion.app.ui.theme.AppColors
 import kotlinx.coroutines.Dispatchers
@@ -43,8 +45,9 @@ fun ShareSheet(
 ) {
     val context = LocalContext.current
     val model = remember(session) { ShareCardModel.fromSession(session) }
-    val imageBitmap = remember(model) {
-        ShareCardRenderer.render(model).asImageBitmap()
+    var template by remember { mutableStateOf(CardTemplate.FULL) }
+    val imageBitmap = remember(model, template) {
+        ShareCardRenderer.render(model, template).asImageBitmap()
     }
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
@@ -75,6 +78,21 @@ fun ShareSheet(
                     fontSize = 16.sp,
                     color = AppColors.Ink
                 )
+                Spacer(Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    CardTemplate.values().forEach { t ->
+                        FilterChip(
+                            selected = template == t,
+                            onClick = { if (!busy) template = t },
+                            label = { Text(t.label, fontSize = 12.sp) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
                 Spacer(Modifier.height(10.dp))
 
                 Image(
@@ -116,7 +134,7 @@ fun ShareSheet(
                         onClick = {
                             runAction("Saving…") {
                                 val file = withContext(Dispatchers.IO) {
-                                    ShareActions.writeCardPng(context, session)
+                                    ShareActions.writeCardPng(context, session, template)
                                 }
                                 "Saved to " + withContext(Dispatchers.IO) {
                                     ShareActions.savePng(context, file, session.workoutSnapshot.name)
@@ -132,7 +150,7 @@ fun ShareSheet(
                         onClick = {
                             runAction("Sharing…") {
                                 val file = withContext(Dispatchers.IO) {
-                                    ShareActions.writeCardPng(context, session)
+                                    ShareActions.writeCardPng(context, session, template)
                                 }
                                 ShareActions.shareImage(context, file, session.workoutSnapshot.name)
                                 "Image shared"

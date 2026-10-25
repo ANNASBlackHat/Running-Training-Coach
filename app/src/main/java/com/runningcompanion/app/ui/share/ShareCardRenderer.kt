@@ -8,6 +8,7 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import com.runningcompanion.app.domain.math.PaceCalculator
 import com.runningcompanion.app.domain.model.GpsPoint
+import com.runningcompanion.app.domain.share.CardTemplate
 import com.runningcompanion.app.domain.share.ShareCardModel
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -146,8 +147,8 @@ object ShareCardRenderer {
 
     private class Stat(val label: String, val value: String, val unit: String, val highlight: Boolean = false)
 
-    fun render(model: ShareCardModel): Bitmap {
-        val height = totalHeight(model)
+    fun render(model: ShareCardModel, template: CardTemplate = CardTemplate.FULL): Bitmap {
+        val height = totalHeight(model, template)
         val bitmap = Bitmap.createBitmap(CARD_WIDTH, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         canvas.drawColor(Color.WHITE)
@@ -156,23 +157,31 @@ object ShareCardRenderer {
         y = drawHeader(canvas, model, y)
         y = drawStatsRow(canvas, model, y)
         y = drawDivider(canvas, y)
-        y = drawTrack(canvas, model, y)
-        y = drawIntervals(canvas, model, y)
-        y = drawLaps(canvas, model, y)
+        if (template == CardTemplate.FULL || template == CardTemplate.ROUTE) {
+            y = drawTrack(canvas, model, y)
+        }
+        if (template == CardTemplate.FULL || template == CardTemplate.LAPS) {
+            y = drawIntervals(canvas, model, y)
+            y = drawLaps(canvas, model, y)
+        }
         drawFooter(canvas, model, y)
         return bitmap
     }
 
     // region section height calculations
 
-    private fun totalHeight(model: ShareCardModel): Int {
+    private fun totalHeight(model: ShareCardModel, template: CardTemplate): Int {
         var h = MARGIN
         h += headerHeight(model)
         h += statsRowHeight()
         h += dividerHeight()
-        h += trackHeight()
-        h += intervalsHeight(model)
-        h += lapsHeight(model)
+        if (template == CardTemplate.FULL || template == CardTemplate.ROUTE) {
+            h += trackHeight()
+        }
+        if (template == CardTemplate.FULL || template == CardTemplate.LAPS) {
+            h += intervalsHeight(model)
+            h += lapsHeight(model)
+        }
         h += footerHeight()
         return h
     }

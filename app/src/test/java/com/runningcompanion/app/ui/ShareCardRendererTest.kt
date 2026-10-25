@@ -11,6 +11,7 @@ import com.runningcompanion.app.domain.model.Session
 import com.runningcompanion.app.domain.model.SessionTotals
 import com.runningcompanion.app.domain.model.Workout
 import com.runningcompanion.app.domain.model.WorkoutItem
+import com.runningcompanion.app.domain.share.CardTemplate
 import com.runningcompanion.app.domain.share.ShareCardModel
 import com.runningcompanion.app.ui.share.ShareCardRenderer
 import org.junit.Test
@@ -95,6 +96,27 @@ class ShareCardRendererTest {
         val bitmap = ShareCardRenderer.render(model)
         assertThat(bitmap.width).isEqualTo(ShareCardRenderer.CARD_WIDTH)
         assertThat(bitmap.height).isGreaterThan(800)
+    }
+
+    @Test
+    fun routeTemplateIsShorterAndLapsTemplateDropsTheTrack() {
+        val model = ShareCardModel.fromSession(buildSession(withTrack = true))
+        val full = ShareCardRenderer.render(model, CardTemplate.FULL)
+        val route = ShareCardRenderer.render(model, CardTemplate.ROUTE)
+        val laps = ShareCardRenderer.render(model, CardTemplate.LAPS)
+        assertThat(route.height).isLessThan(full.height)
+        assertThat(laps.height).isLessThan(full.height)
+        // ROUTE has no intervals/laps section, LAPS has no track: route is the shortest
+        assertThat(route.height).isLessThan(laps.height)
+    }
+
+    @Test
+    fun allTemplatesRenderWithoutCrash() {
+        val model = ShareCardModel.fromSession(buildSession(withTrack = false))
+        for (template in CardTemplate.values()) {
+            val bitmap = ShareCardRenderer.render(model, template)
+            assertThat(bitmap.width).isEqualTo(ShareCardRenderer.CARD_WIDTH)
+        }
     }
 
     @Test
