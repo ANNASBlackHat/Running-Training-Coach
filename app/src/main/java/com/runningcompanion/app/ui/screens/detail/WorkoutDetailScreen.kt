@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
@@ -67,7 +68,15 @@ fun WorkoutDetailScreen(
                 },
                 actions = {
                     IconButton(onClick = onEditWorkout) {
-                        Icon(Icons.Default.Edit, contentDescription = "Edit Workout", tint = AppColors.Run)
+                        if (workout.isTemplate) {
+                            Icon(
+                                Icons.Default.ContentCopy,
+                                contentDescription = "Copy and edit workout",
+                                tint = AppColors.Run
+                            )
+                        } else {
+                            Icon(Icons.Default.Edit, contentDescription = "Edit Workout", tint = AppColors.Run)
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = AppColors.Paper)

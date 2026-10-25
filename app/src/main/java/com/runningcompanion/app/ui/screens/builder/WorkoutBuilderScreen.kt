@@ -131,7 +131,12 @@ fun WorkoutBuilderScreen(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val previewWorkout = Workout(
-        id = initialWorkout?.id ?: UUID.randomUUID().toString(),
+        // A template is a seed: saving an edit creates a new, user-owned workout.
+        id = when {
+            initialWorkout == null -> UUID.randomUUID().toString()
+            initialWorkout.isTemplate -> UUID.randomUUID().toString()
+            else -> initialWorkout.id
+        },
         name = workoutName,
         isTemplate = false,
         items = workoutItems.toList()

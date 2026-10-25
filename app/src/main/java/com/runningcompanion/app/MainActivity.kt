@@ -31,6 +31,7 @@ import com.runningcompanion.app.domain.model.RuntimeSegment
 import com.runningcompanion.app.domain.model.Session
 import com.runningcompanion.app.domain.model.Workout
 import com.runningcompanion.app.domain.model.WorkoutTemplates
+import com.runningcompanion.app.domain.model.duplicateAsCustom
 import com.runningcompanion.app.service.foreground.WorkoutForegroundService
 import com.runningcompanion.app.ui.screens.builder.WorkoutBuilderScreen
 import com.runningcompanion.app.ui.screens.detail.WorkoutDetailScreen
@@ -181,15 +182,20 @@ class MainActivity : ComponentActivity() {
 
                     // Observe service connection
                     val currentService by _serviceFlow.collectAsState()
+                    val activeWorkout by (currentService?.activeWorkout
+                        ?: remember { kotlinx.coroutines.flow.MutableStateFlow<Workout?>(null) })
+                        .collectAsState()
 
-                    // Automatically restore live workout screen if service is running or paused
+                    // Restore the live workout screen once when the service reconnects
+                    // (app start / activity recreation). After that the user may visit
+                    // Home mid-run, where a resume bar brings them back.
+                    var restoredActiveWorkout by remember { mutableStateOf(false) }
                     LaunchedEffect(currentService) {
                         val service = currentService ?: return@LaunchedEffect
                         service.activeWorkout.collect { runningWorkout ->
-                            if (runningWorkout != null) {
-                                if (currentScreen !is Screen.Run) {
-                                    currentScreen = Screen.Run(runningWorkout)
-                                }
+                            if (runningWorkout != null && !restoredActiveWorkout) {
+                                restoredActiveWorkout = true
+                                currentScreen = Screen.Run(runningWorkout)
                             }
                         }
                     }
@@ -207,9 +213,14 @@ class MainActivity : ComponentActivity() {
                         is Screen.Home -> {
                             HomeScreen(
                                 workouts = allWorkouts.ifEmpty { WorkoutTemplates.allTemplates },
+                                recentSession = allSessions.maxByOrNull { it.startedAt },
+                                activeWorkout = activeWorkout,
                                 onStartWorkout = { workout ->
                                     startWorkoutSession(workout)
                                     currentScreen = Screen.Run(workout)
+                                },
+                                onResumeWorkout = {
+                                    activeWorkout?.let { currentScreen = Screen.Run(it) }
                                 },
                                 onWorkoutDetail = { workout ->
                                     currentScreen = Screen.Detail(workout)
@@ -219,6 +230,24 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onHistoryClicked = {
                                     currentScreen = Screen.History
+                                },
+                                onSessionClicked = { session ->
+                                    currentScreen = Screen.Results(session)
+                                },
+                                onDuplicateWorkout = { workout ->
+                                    coroutineScope.launch {
+                                        appContainer.workoutRepository.saveWorkout(workout.duplicateAsCustom())
+                                    }
+                                },
+                                onRenameWorkout = { workout, newName ->
+                                    coroutineScope.launch {
+                                        appContainer.workoutRepository.saveWorkout(workout.copy(name = newName))
+                                    }
+                                },
+                                onDeleteWorkout = { workout ->
+                                    coroutineScope.launch {
+                                        appContainer.workoutRepository.deleteWorkout(workout.id)
+                                    }
                                 }
                             )
                         }
@@ -231,7 +260,13 @@ class MainActivity : ComponentActivity() {
                                     currentScreen = Screen.Run(screen.workout)
                                 },
                                 onEditWorkout = {
-                                    currentScreen = Screen.Builder(initialWorkout = screen.workout)
+                                    // Editing a template copies it instead of overwriting the seed.
+                                    val editable = if (screen.workout.isTemplate) {
+                                        screen.workout.duplicateAsCustom()
+                                    } else {
+                                        screen.workout
+                                    }
+                                    currentScreen = Screen.Builder(initialWorkout = editable)
                                 },
                                 onBackClicked = {
                                     currentScreen = Screen.Home
@@ -264,7 +299,8 @@ class MainActivity : ComponentActivity() {
                                 onPauseClicked = { currentService?.pauseWorkout() },
                                 onResumeClicked = { currentService?.resumeWorkout() },
                                 onSkipClicked = { currentService?.skipSegment() },
-                                onStopConfirmed = { currentService?.stopWorkout() }
+                                onStopConfirmed = { currentService?.stopWorkout() },
+                                onMinimize = { currentScreen = Screen.Home }
                             )
                         }
 

@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -13,8 +14,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.runningcompanion.app.domain.model.RuntimeSegment
-import com.runningcompanion.app.domain.model.SegmentLength
 import com.runningcompanion.app.domain.model.SegmentType
+import com.runningcompanion.app.domain.summary.WorkoutSummary
 import com.runningcompanion.app.ui.theme.AppColors
 
 @Composable
@@ -27,29 +28,30 @@ fun SessionStrip(
 ) {
     if (segments.isEmpty()) return
 
-    // Calculate approximate weight for each segment
-    val weights = segments.map { seg ->
-        when (val len = seg.segment.length) {
-            is SegmentLength.Time -> len.seconds.toFloat()
-            is SegmentLength.Distance -> (len.meters / 1000f) * 330f // ~5:30/km baseline
-        }.coerceAtLeast(10f)
+    // Blocks are proportional to their estimated duration, with a floor so short
+    // intervals never collapse into invisible slivers.
+    val weights = remember(segments) {
+        segments.map { WorkoutSummary.estimatedSeconds(it).toFloat().coerceAtLeast(10f) }
     }
-    val totalWeight = weights.sum()
 
     Canvas(
         modifier = modifier
             .fillMaxWidth()
             .height(height)
     ) {
-        val totalWidth = size.width
         val gapPx = 2.dp.toPx()
-        val totalGaps = (segments.size - 1).coerceAtLeast(0) * gapPx
-        val availableWidth = (totalWidth - totalGaps).coerceAtLeast(0f)
+        val minimumBlockWidth = 4.dp.toPx()
+        val blockWidths = computeStripWidths(
+            weights = weights,
+            totalWidth = size.width,
+            gap = gapPx,
+            minWidth = minimumBlockWidth
+        )
 
         var xOffset = 0f
 
         segments.forEachIndexed { index, seg ->
-            val segmentWidth = (weights[index] / totalWeight) * availableWidth
+            val segmentWidth = blockWidths[index]
             val isCurrent = currentIndex != null && index == currentIndex
             val isFinished = currentIndex != null && index < currentIndex
 
@@ -75,7 +77,7 @@ fun SessionStrip(
             // If rest, draw subtle outline
             if (seg.segment.type == SegmentType.REST) {
                 drawRoundRect(
-                    color = AppColors.Ink.copy(alpha = 0.4f),
+                    color = AppColors.Ink.copy(alpha = 0.6f),
                     topLeft = Offset(xOffset, 0f),
                     size = Size(segmentWidth, size.height),
                     cornerRadius = CornerRadius(3.dp.toPx(), 3.dp.toPx()),

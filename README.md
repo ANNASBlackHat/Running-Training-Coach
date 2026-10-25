@@ -14,7 +14,7 @@ An Android app that guides interval-training sessions by voice — build a worko
 | Audio | Android `TextToSpeech` for voice cues + `ToneGenerator` beeps |
 | Location | `LocationManager` GPS provider (wrapped behind a `LocationProvider` interface, with a mock provider for tests) |
 | Build | Gradle 8.12 (wrapper), AGP 8.8.2, KSP 2.1.10-1.0.29 |
-| Tests | JUnit 4, Google Truth, kotlinx-coroutines-test |
+| Tests | JUnit 4, Google Truth, kotlinx-coroutines-test, Robolectric + Compose UI testing (JVM) |
 
 ## Project structure
 
@@ -24,7 +24,7 @@ An Android app that guides interval-training sessions by voice — build a worko
 │   ├── build/               # Generated Gradle output (gitignored)
 │   └── src/
 │       ├── main/            # App code — see package layout below
-│       └── test/            # JVM unit tests (JUnit4) for the domain layer
+│       └── test/            # JVM tests: domain logic + Robolectric Compose screen tests
 ├── gradle/wrapper/          # Gradle 8.12 wrapper jar + properties
 ├── .specs/                  # Product specs: MVP scope, tech spec, user stories, UI style guide
 ├── build.gradle.kts         # Root build: declares plugin versions (apply false)
@@ -105,14 +105,14 @@ Useful tasks while developing:
 
 ## Running tests
 
-Unit tests live in `app/src/test/java/com/runningcompanion/app/domain/` and cover the pure-Kotlin domain layer (no device needed):
+Tests live in `app/src/test/java/com/runningcompanion/app/` and all run on the JVM — the domain suites directly, the Compose screen tests through Robolectric, so no device or emulator is needed:
 
 ```bash
-./gradlew testDebugUnitTest        # run all JVM unit tests
+./gradlew testDebugUnitTest        # run all JVM tests
 ./gradlew testDebugUnitTest --tests '*WorkoutRunnerTest'   # single class
 ```
 
-HTML/XML reports land in `app/build/reports/tests/`.
+HTML/XML reports land in `app/build/reports/tests/`. The first Robolectric run downloads an `android-all` jar, so it needs network access once.
 
 | Test file | Covers |
 | --- | --- |
@@ -121,6 +121,15 @@ HTML/XML reports land in `app/build/reports/tests/`.
 | `MathAndPaceTest.kt` | Pace and geo calculations |
 | `WorkoutEntitySerializationTest.kt` | Room entity ↔ JSON serialization round-trips |
 | `SimulatedWorkoutIntegrationTest.kt` | Full simulated session driven by `MockLocationProvider` |
+| `WorkoutSummaryTest.kt` | Duration estimates from target paces, interval summaries, list meta lines |
+| `WorkoutOpsTest.kt` | Duplicating a workout/template into a user-owned copy |
+| `RelativeDayTest.kt` | "Today" / "Yesterday" / absolute day labels |
+| `StripGeometryTest.kt` | Timeline strip layout with minimum block widths |
+| `HomeScreenTest.kt` | Home rows, template rail, row menu, delete confirmation, last-run and resume cards |
+| `RenameWorkoutFormTest.kt` | Rename form typing, trimming, blank-name validation |
+| `LiveRunScreenTest.kt` | Minimizing a live run without stopping it |
+
+One limitation of the Robolectric setup: a Compose dialog that contains a text field never reaches idle, so the rename dialog's shell is not exercised in `HomeScreenTest`; its form is tested directly by `RenameWorkoutFormTest` instead.
 
 Instrumented tests are configured (`androidTestImplementation`, `testInstrumentationRunner = AndroidJUnitRunner`) but none exist yet:
 
